@@ -1,0 +1,209 @@
+#platform "GOLDELOX-GFX2"
+
+/*    4DGL Demo Application
+      - Test Serial Echo  -
+     -- GOLDELOX Platform --
+*/
+
+#inherit "4DGL_16bitColours.fnc"
+
+#DATA
+    byte req 0x01, 0x00, 0x42, 0x02, 0xFF, 0x02, 0x43, 0x03, 0xFD
+#END
+
+var combuf[60];
+var out[8];
+
+
+func main()
+var chr, e, e2, test1, x, y, i;
+
+    e := 0;
+    e2 := 0;
+    test1 := 0;
+    x := 0;
+    y := 2;
+
+repeat
+    gfx_Contrast(16);
+    gfx_Set(SCREEN_MODE, 1);
+    //gfx_Set(OUTLINE_COLOUR, DARKOLIVEGREEN); // set outline colour, gfx_Cls() will draw outline
+    gfx_Cls();
+    txt_Set(FONT_ID, 0);
+    txt_MoveCursor(0,0);                // reset cursor to line 1, column 2
+    txt_FGcolour(GREEN);
+    putstr("Serial 9600 baud");
+
+    setbaud(BAUD_9600);    //  9600 baud comms
+    com_Init(combuf, 120, 0);       // set up a comms circular buffer, use the entire buffer, no sync character
+
+    pokeW(TIMER0, 1000);     // set delay so we stay in next loop for 2 seconds
+
+    repeat
+
+        txt_MoveCursor(1,1);                        // reset cursor to line 3, column 2
+        print("Buffered : ", [DEC4Z] ( com_Count() ));        // show count of chars in buffer
+
+        if (com_Full())
+            txt_MoveCursor(2,1);                // reset cursor to line 5, column 2
+            print("Buffer Full ", (++e) );         // print error count
+        endif
+
+        if (com_Error())
+            txt_MoveCursor(3,1);                // reset cursor to line 7, column 2
+            print("Comms Error ", (++e2) );         // print error count
+        endif
+
+        if (!peekW(TIMER0))
+            x := 0;
+            y := 2;
+            txt_MoveCursor(y,x);
+
+            while ( (chr := serin()) >= 0)
+                print([HEX2] chr);
+                x := x+2;
+                if (x > 16)
+                    x := 0;
+                    y++;
+                endif
+                if (y > 13)
+                    y := 2;
+                endif
+                txt_MoveCursor(y,x);
+                if(x%4)
+                    txt_FGcolour(GREENYELLOW);
+                else
+                    txt_FGcolour(GREEN);
+                endif
+            wend
+
+            txt_FGcolour(GREEN);
+            txt_MoveCursor(14,0);
+            print("sent: ", (++test1) );
+            if (test1 >= 30)
+                test1 := 0;
+                gfx_Contrast(0);
+            endif
+
+            txt_MoveCursor(15,0);
+            i := 0;
+            while (i < 9)
+                serout(req[i]);
+                print([HEX2] req[i]);
+                i++;
+            wend
+
+            pokeW(TIMER0, 6000);
+
+        endif
+
+    until ( com_Full() || com_Error() );      // reset if error occurred
+
+forever
+
+
+endfunc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
