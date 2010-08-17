@@ -95,32 +95,48 @@ func printNumber(var number, var ypos) // afficher chiffres avec Gif sur SD
     xpos := 127;
     n := 4;     // 4 digits to print
 
-    while(n--)
 
-        if((n == 3) && (number < 0))             // signe moins
-            media_SetSector(0x0000, 0x0018);
-            media_Image(30, ypos);
-        endif
+    if(number < 0)             // signe moins
+        media_SetSector(0x0000, 0x0018);
+        media_Image(30, ypos);
+    endif
 
-        if((n == 3) && (number >= 0))            // pas de signe moins
-            gfx_RectangleFilled(30, ypos, 41, ypos+28 , BLACK);
-        endif
+    if(number >= 0)            // pas de signe moins
+        gfx_RectangleFilled(30, ypos, 41, ypos+28 , BLACK);
+    endif
 
-        if (n == 2)                              // virgule
-            media_SetSector(0x0000, 0x0017);
-            xpos := xpos-7;
-            media_Image(xpos, ypos);
-        endif
+    media_SetSector(0x0000, 0x0000);
 
-        media_SetSector(0x0000, 0x0000);
-        xpos := xpos-19;                        // left shift image position
+    xpos := xpos-19;                        // left shift image position
+    media_VideoFrame(xpos, ypos, ABS( number%10 ));     // print numbers
+    number := number/10;
+
+    media_SetSector(0x0000, 0x0017);        // virgule
+
+    xpos := xpos-7;
+    media_Image(xpos, ypos);
+
+    media_SetSector(0x0000, 0x0000);
+
+    xpos := xpos-19;                        // left shift image position
+    media_VideoFrame(xpos, ypos, ABS( number%10 ));     // print numbers
+    number := number/10;
+
+    xpos := xpos-19;                        // left shift image position
+    if (ABS(number) > 0)
         media_VideoFrame(xpos, ypos, ABS( number%10 ));     // print numbers
+    else
+        gfx_RectangleFilled(xpos, ypos, xpos + 19, ypos+28 , BLACK);
+    endif
+    number := number/10;
 
-        number := number/10;
-
-    wend
-
-
+    xpos := xpos-19;                        // left shift image position
+    if (ABS(number) > 0)
+        media_VideoFrame(xpos, ypos, ABS( number%10 ));     // print numbers
+    else
+        gfx_RectangleFilled(xpos, ypos, xpos + 19, ypos+28 , BLACK);
+    endif
+    number := number/10;
 
 endfunc
 
@@ -243,4 +259,118 @@ forever
 
 
 endfunc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
