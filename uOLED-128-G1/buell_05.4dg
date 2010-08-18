@@ -9,8 +9,8 @@
 #DATA
     byte req 0x01, 0x00, 0x42, 0x02, 0xFF, 0x02, 0x43, 0x03, 0xFD
 #END
-var EngTemp, IntakeTemp, AFV, EngSpeed, GearSelect, BattVolt, Trottle;
-var combuf[60];
+var EngTemp, IntakeTemp, AFV, EngSpeed, GearSelect, BattVolt, Trottle, CheckSum, CalcCS;
+var combuf[70];
 var ETlog[64], AFVlog[64];
 var ETptr, AFVptr, LogParity;
 
@@ -39,7 +39,7 @@ endfunc
 func Log()  // Logging dans buffer tournant
     var i, j;
     i := EngTemp / 37;          //37
-    j := ((AFV-800) / 2);
+    j := ((AFV/2) - 400);
 
     if (LogParity)
         ETlog[ETptr] := (ETlog[ETptr] & 0x00FF) + ((i & 0x00FF) * 0x0100);
@@ -62,15 +62,15 @@ func DispChart()  // afficher le graphique
     i := 1;
 
     gfx_Clipping(OFF);
-    gfx_ClipWindow(0, 65, 128, 128);
+    gfx_ClipWindow(0, 65, 128, 128);   // seulement le bas de l'écran
     gfx_Clipping(ON);
 
     while (i < 129)
 
         IncPtr();
-        gfx_Line(i, 128, i, 64, 0x0000);
+        gfx_Line(i, 128, i, 64, 0x0000);    //efface la ligne courante
 
-        if (LogParity)
+        if (LogParity)                      //lecture des 2 buffers
             ETdot := ( ETlog[ETptr] / 0x100 );
             AFVdot := ( AFVlog[AFVptr] / 0x100 );
         else
@@ -78,8 +78,10 @@ func DispChart()  // afficher le graphique
             AFVdot := ( AFVlog[AFVptr] & 0x00FF );
         endif
 
-        gfx_Line(i, 128, i, (128 -  ETdot), 0x8200);
-        gfx_PutPixel(i, (128 -  ETdot), 0xFC00);
+        //dessin temperature moteur
+        gfx_Line(i, 128, i, (138 -  ETdot), 0x8200);
+        gfx_PutPixel(i, (138 -  ETdot), 0xFC00);
+        //dessin AFV
         gfx_Line(i, (129 - (AFVdot/3) ), i, (127 - ( AFVdot/3) ), YELLOW);
         gfx_PutPixel(i, (130 -  (AFVdot/3)), 0x0000);
         gfx_PutPixel(i, (127 -  (AFVdot/3)), 0x0000);
@@ -171,6 +173,7 @@ var chr, timeOut, logCount, x;
     AFVptr := 0;
     LogParity := 0;
     EngTemp:=0;
+    CalcCS := 0;
 
 repeat
     while (media_Init() == 0)           // initialise and test the uSD card
@@ -180,11 +183,11 @@ repeat
     wend
 
     gfx_Cls();
-    gfx_Contrast(15);
+    gfx_Contrast(16);
     //gfx_Set(SCREEN_MODE, 1);
 
     setbaud(BAUD_9600);                 //  9600 baud comms
-    com_Init(combuf, 120, 0);           // set up a comms circular buffer, use the entire buffer, no sync character
+    com_Init(combuf, 139, 0);           // set up a comms circular buffer, use the entire buffer, no sync character
 
     pokeW(TIMER0, 1000);                // set delay so we stay in next loop for 1 seconds
 
@@ -210,6 +213,8 @@ repeat
                 IntakeTemp := 0;
                 AFV := 0;
                 GearSelect := 0;
+                CalcCS := 0;
+
 
                 while ( (chr:=serin()) >= 0 )           // vider buffer in
                     if (x == 11) EngSpeed := EngSpeed + chr;
@@ -230,7 +235,13 @@ repeat
                     if (x == 52) AFV := AFV + chr;                          // 52 = AFV
                     if (x == 53) AFV := AFV + ( chr * 0x100);               // 53 = AFV
 
-                    if (x == 100) GearSelect := chr;
+                    if (x == 106) CheckSum := chr;                         // 106 data XOR checksum
+
+                    //if (x == 134) CheckSum := chr;            // only on DDFI-III ECM (post 2008 ?)
+                    //if (x == 100) GearSelect := chr;          // only on DDFI-III ECM (post 2008 ?)
+
+                    if (x > 0) CalcCS ^= chr;       // compute XOR check sum
+
                     x++;
                 wend
 
@@ -248,7 +259,7 @@ repeat
 
             Request();                  // send live data request
 
-            pokeW(TIMER0, 2000);
+            pokeW(TIMER0, 1000);
 
         endif
 
