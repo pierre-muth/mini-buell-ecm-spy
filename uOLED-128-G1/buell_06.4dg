@@ -45,13 +45,9 @@ func Log()  // Logging dans buffer tournant
 
     if (LogParity)
         ETlog[ETptr] := (ETlog[ETptr] & 0x00FF) + ((i & 0x00FF) * 0x0100);
-    else
-        ETlog[ETptr] := (i & 0x00FF);
-    endif
-
-    if (LogParity)
         AFVlog[AFVptr] := (AFVlog[AFVptr] & 0x00FF) + ((j & 0x00FF) * 0x0100);
     else
+        ETlog[ETptr] := (i & 0x00FF);
         AFVlog[AFVptr] := (j & 0x00FF);
     endif
 
@@ -60,43 +56,47 @@ func Log()  // Logging dans buffer tournant
 endfunc
 
 func DispChart()  // afficher le graphique
-    var i, ETdot, AFVdot;
+    var i, ETdot, AFVdot, color;
     i := 1;
 
+    // seulement le bas de l'écran
     gfx_Clipping(OFF);
-    gfx_ClipWindow(0, 65, 128, 128);   // seulement le bas de l'écran
+    gfx_ClipWindow(0, 65, 128, 128);
     gfx_Clipping(ON);
 
-    while (i < 129)
+    while (i < 128)
 
         IncPtr();
-        gfx_Line(i, 128, i, 64, 0x0000);    //efface la ligne courante
 
-        if (LogParity)                      //lecture des 2 buffers
-            ETdot := ( ETlog[ETptr] / 0x100 );
-            AFVdot := ( AFVlog[AFVptr] / 0x100 );
+        //efface la ligne courante
+        gfx_Line(i, 128, i, 64, 0x0000);
+
+        //lecture des 2 buffers
+        if (LogParity)
+            pokeW(VM_OVERFLOW, 0);
+            ETdot := ( ETlog[ETptr] >> 8 );
+            pokeW(VM_OVERFLOW, 0);
+            AFVdot := ( AFVlog[AFVptr] >> 8 );
         else
             ETdot := ( ETlog[ETptr] & 0x00FF );
             AFVdot := ( AFVlog[AFVptr] & 0x00FF );
         endif
 
         //dessin temperature moteur
-        gfx_Line(i, 128, i, (138 -  ETdot), 0x8200);
+        gfx_Line(i, 128, i, (138 -  ETdot), (0x8200 ));
         gfx_PutPixel(i, (138 -  ETdot), 0xFC00);
+        gfx_PutPixel(i, (137 -  ETdot), 0xFC00);
+
         //dessin AFV
-//        gfx_Line(i, (129 - (AFVdot/3) ), i, (127 - ( AFVdot/3) ), YELLOW);
         gfx_PutPixel(i, (128 -  (AFVdot/3)), YELLOW);
         gfx_PutPixel(i, (129 -  (AFVdot/3)), YELLOW);
         gfx_PutPixel(i, (130 -  (AFVdot/3)), 0x0000);
         gfx_PutPixel(i, (127 -  (AFVdot/3)), 0x0000);
+
         i++;
 
-        txt_MoveCursor(12,0);
-        print("3> ",  AFVdot);
-        txt_MoveCursor(13,0);
-        print("4> ",  ETdot);
-
     wend
+    IncPtr();
     gfx_Clipping(OFF);
 
 endfunc
@@ -148,6 +148,17 @@ func printNumber(var number, var ypos) // afficher chiffres avec Gif sur SD
         gfx_RectangleFilled(xpos, ypos, xpos + 19, ypos+28 , BLACK);
     endif
     number := number/10;
+
+endfunc
+
+func DispTxt()  // afficher icones
+    media_SetSector(0x0000, 0x001E);        // thermometer image
+    media_Image(8,0);
+    printNumber( (EngTemp - 400), 0);
+
+    media_SetSector(0x0000, 0x001A);        // AFV image
+    media_Image(0,30);
+    printNumber(AFV, 30);
 
 endfunc
 
@@ -247,14 +258,15 @@ repeat
                 wend
 
                 logCount++;
-                if (logCount > 1)           // Logging tout les n request
+                if (logCount > 0)           // Logging tout les n request
                     logCount := 0;
                     Log();
+                    DispChart();
                 endif
 
             endif
 
-            Disp();
+            DispTxt();
 
             Request();                  // send live data request
 
@@ -262,20 +274,14 @@ repeat
 
         endif
 
-        txt_MoveCursor(14,0);
-        print("5> ", pin_Read(IO2) );
-
         if ( !pin_Read(IO2) && !screenFliped)
              screenFliped := 1;
              screenMode++;
              if(screenMode > 2)
                 screenMode := 0;
              endif
-             Disp();
+             DispTxt();
         endif
-
-        txt_MoveCursor(15,0);
-        print("6> ", screenMode );
 
     until ( com_Full() || com_Error() );      // reset if error occurred
 
