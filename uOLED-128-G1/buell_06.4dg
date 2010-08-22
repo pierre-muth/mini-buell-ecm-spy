@@ -11,7 +11,7 @@
 #END
 
 var EngTemp, IntakeTemp, AFV, EngSpeed, GearSelect, BattVolt, Trottle, CheckSum, CalcCS;
-var screenMode, screenFliped;
+var screenMode, screenFliped, logCount;
 var combuf[70];
 var ETlog[64], AFVlog[64];
 var ETptr, AFVptr, LogParity;
@@ -165,22 +165,23 @@ endfunc
 func Disp()  // draw different screens
 
     if (screenFliped)  gfx_Cls();
+
     if (screenMode == 0)
-            txt_FGcolour(WHITE);
-            txt_MoveCursor(0,0);
-            print("Engine Temp" );
-            txt_MoveCursor(3,0);
-            print((EngTemp/10) -40);
+        DispTxt();
+        if (screenFliped || (logCount == 0))
+             DispChart();
+        endif
+
     endif
+
     if (screenMode == 1)
-            txt_MoveCursor(0,0);
-            print("A F V");
-            txt_MoveCursor(3,0);
-             print(AFV);
+        txt_MoveCursor(0,0);
+        print("Batt Volt");
+        txt_MoveCursor(3,0);
+        print(BattVolt);
     endif
+
     if (screenMode == 2)
-            txt_MoveCursor(0,0);
-            print("summary" );
     endif
 
 endfunc
@@ -197,7 +198,7 @@ endfunc
 //--------------- Main -----------------
 
 func main()
-var chr, timeOut, logCount, x;
+var chr, timeOut, x;
     timeOut := 0;
     logCount := 0;
     ETptr := 0;
@@ -258,15 +259,14 @@ repeat
                 wend
 
                 logCount++;
-                if (logCount > 0)           // Logging tout les n request
+                if (logCount > 1)           // Logging tout les n request
                     logCount := 0;
                     Log();
-                    DispChart();
                 endif
 
             endif
 
-            DispTxt();
+            Disp();
 
             Request();                  // send live data request
 
@@ -280,7 +280,7 @@ repeat
              if(screenMode > 2)
                 screenMode := 0;
              endif
-             DispTxt();
+             Disp();
         endif
 
     until ( com_Full() || com_Error() );      // reset if error occurred
