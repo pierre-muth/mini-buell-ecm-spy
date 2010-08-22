@@ -89,8 +89,8 @@ func DispChart()  // afficher le graphique
         gfx_PutPixel(i, (137 -  ETdot), 0xFC00);
 
         //dessin AFV
-        gfx_PutPixel(i, (128 -  (AFVdot/3)), YELLOW);
-        gfx_PutPixel(i, (129 -  (AFVdot/3)), YELLOW);
+        gfx_PutPixel(i, (128 -  (AFVdot/3)), 0xFFFF);
+        gfx_PutPixel(i, (129 -  (AFVdot/3)), 0xFFFF);
         gfx_PutPixel(i, (130 -  (AFVdot/3)), 0x0000);
         gfx_PutPixel(i, (127 -  (AFVdot/3)), 0x0000);
 
@@ -102,64 +102,29 @@ func DispChart()  // afficher le graphique
 
 endfunc
 
-func printNumber(var number, var ypos) // afficher chiffres avec Gif sur SD
-    var n, xpos;
-    xpos := 127;
-    n := 4;     // 4 digits to print
-
-
-    if(number < 0)             // signe moins
-        media_SetSector(0x0000, 0x0018);
-        media_Image(30, ypos);
-    endif
-
-    if(number >= 0)            // pas de signe moins
-        gfx_RectangleFilled(30, ypos, 41, ypos+28 , BLACK);
-    endif
-
-    media_SetSector(0x0000, 0x0000);
-
-    xpos := xpos-19;                        // left shift image position
-    media_VideoFrame(xpos, ypos, ABS( number%10 ));     // print numbers
-    number := number/10;
-
-    media_SetSector(0x0000, 0x0017);        // virgule
-
-    xpos := xpos-7;
-    media_Image(xpos, ypos);
-
-    media_SetSector(0x0000, 0x0000);
-
-    xpos := xpos-19;                        // left shift image position
-    media_VideoFrame(xpos, ypos, ABS( number%10 ));     // print numbers
-    number := number/10;
-
-    xpos := xpos-19;                        // left shift image position
-    if (ABS(number) > 0)
-        media_VideoFrame(xpos, ypos, ABS( number%10 ));     // print numbers
-    else
-        gfx_RectangleFilled(xpos, ypos, xpos + 19, ypos+28 , BLACK);
-    endif
-    number := number/10;
-
-    xpos := xpos-19;                        // left shift image position
-    if (ABS(number) > 0)
-        media_VideoFrame(xpos, ypos, ABS( number%10 ));     // print numbers
-    else
-        gfx_RectangleFilled(xpos, ypos, xpos + 19, ypos+28 , BLACK);
-    endif
-    number := number/10;
-
-endfunc
-
 func DispBigTxt()  // afficher icones
-    media_SetSector(0x0000, 0x001E);        // thermometer image
-    media_Image(8,0);
-    printNumber( (EngTemp - 400), 0);
 
-    media_SetSector(0x0000, 0x001A);        // AFV image
-    media_Image(0,30);
-    printNumber(AFV, 30);
+    //engine temperature
+    txt_FGcolour(0xFC00);
+    txt_Width(3);
+    txt_Height(3);
+    txt_MoveCursor(0,0);
+    putnum(0xB30A, (EngTemp/10)-40);
+    txt_MoveCursor(0,4);
+    putstr(",");
+    txt_MoveCursor(0,5);
+    putnum(UDEC1Z, IntakeTemp%10);
+
+    //AFV
+    txt_FGcolour(0xFFFF);
+    txt_Width(3);
+    txt_Height(3);
+    txt_MoveCursor(1,0);
+    putnum(0xB30A, (AFV/10));
+    txt_MoveCursor(1,4);
+    putstr(",");
+    txt_MoveCursor(1,5);
+    putnum(UDEC1Z, AFV%10);
 
 endfunc
 
@@ -181,7 +146,7 @@ func Disp()  // draw different screens
         txt_MoveCursor(0,0);
         txt_Bold(1);
         print("Batt Volt");
-        txt_FGcolour(YELLOW);
+        txt_FGcolour(0xFFFF);
         txt_MoveCursor(0,16);
         putnum(UDEC2Z, BattVolt%100);
         txt_MoveCursor(0,15);
@@ -194,7 +159,7 @@ func Disp()  // draw different screens
         txt_MoveCursor(2,0);
         txt_Bold(1);
         print("Intake");
-        txt_FGcolour(YELLOW);
+        txt_FGcolour(0xFFFF);
         txt_MoveCursor(2,16);
         putnum(UDEC1Z, IntakeTemp%10);
         txt_MoveCursor(2,15);
@@ -207,7 +172,7 @@ func Disp()  // draw different screens
         txt_MoveCursor(4,0);
         txt_Bold(1);
         print("RPM");
-        txt_FGcolour(YELLOW);
+        txt_FGcolour(0xFFFF);
         txt_MoveCursor(4,10);
         putnum(UDEC5ZB, EngSpeed);
 
@@ -216,7 +181,7 @@ func Disp()  // draw different screens
         txt_MoveCursor(6,0);
         txt_Bold(1);
         print("Throttle");
-        txt_FGcolour(YELLOW);
+        txt_FGcolour(0xFFFF);
         txt_MoveCursor(6,16);
         putnum(UDEC1Z, Trottle%10);
         txt_MoveCursor(6,15);
@@ -228,6 +193,7 @@ func Disp()  // draw different screens
         txt_FGcolour(0xFC00);
         txt_MoveCursor(15,0);
         print("CS Calc/Rx");
+        txt_FGcolour(0xFFFF);
         txt_MoveCursor(15, 13);
         print([HEX2]CalcCS);
         print("/");
@@ -273,11 +239,6 @@ func main()
     next
 
 repeat
-    while (media_Init() == 0)           // initialise and test the uSD card
-        print("No uSD CARD Installed");
-        pause(2000);
-        gfx_Cls();
-    wend
 
     gfx_Cls();
     gfx_Contrast(16);
@@ -305,44 +266,43 @@ repeat
 
                  // vider buffer in
                 while ( (chr:=serin()) >= 0 )
-                    if (x == 1) EngSpeed := EngSpeed + chr;                 // 11
-                    if (x == 2) EngSpeed := EngSpeed + ( chr * 0x100);      // 12
-                    if (x == 3) Trottle := Trottle + chr;                   // 25
-                    if (x == 4) Trottle := Trottle + ( chr * 0x100);        // 26
-                    if (x == 5) BattVolt := BattVolt + chr;                 // 28
-                    if (x == 6) BattVolt := BattVolt + ( chr * 0x100);      // 29
-                    if (x == 7) EngTemp := EngTemp + chr;                   // 30 = offset last byte Engine temp
-                    if (x == 8) EngTemp := EngTemp + ( chr * 0x100);        // 31 = offset first byte Engine temp
-                    if (x == 9) IntakeTemp := IntakeTemp + chr;            // 32
-                    if (x == 10) IntakeTemp := IntakeTemp + ( chr * 0x100); // 33
-                    if (x == 11) AFV := AFV + chr;                          // 52 = AFV
-                    if (x == 12) AFV := AFV + ( chr * 0x100);               // 53 = AFV
-                    if (x == 13) CheckSum := chr;                         // 106 data XOR checksum
-                    if ((x > 0) && (x < 13)) CalcCS ^= chr;       // compute XOR check sum
+                    if (x == 11) EngSpeed := EngSpeed + chr;                 // 11
+                    if (x == 12) EngSpeed := EngSpeed + ( chr * 0x100);      // 12
+                    if (x == 25) Trottle := Trottle + chr;                   // 25
+                    if (x == 26) Trottle := Trottle + ( chr * 0x100);        // 26
+                    if (x == 28) BattVolt := BattVolt + chr;                 // 28
+                    if (x == 29) BattVolt := BattVolt + ( chr * 0x100);      // 29
+                    if (x == 30) EngTemp := EngTemp + chr;                   // 30 = offset last byte Engine temp
+                    if (x == 31) EngTemp := EngTemp + ( chr * 0x100);        // 31 = offset first byte Engine temp
+                    if (x == 32) IntakeTemp := IntakeTemp + chr;            // 32
+                    if (x == 33) IntakeTemp := IntakeTemp + ( chr * 0x100); // 33
+                    if (x == 52) AFV := AFV + chr;                          // 52 = AFV
+                    if (x == 53) AFV := AFV + ( chr * 0x100);               // 53 = AFV
+                    if (x == 106) CheckSum := chr;                         // 106 data XOR checksum
+                    if ((x > 0) && (x < 106)) CalcCS ^= chr;       // compute XOR check sum
 
                     x++;
                 wend
 
                 if (CalcCS == CheckSum)         //si checkSum ok
                     logCount++;
-                    if (logCount > 0)           // Logging tout les n request
+                    if (logCount > 4)           // Logging tout les n request
                         logCount := 0;
                         Log();
                     endif
                 endif
 
-            endif
+                Disp();
 
-            Disp();
+            endif
 
             Request();                  // send live data request
 
-            pokeW(TIMER0, 2000);
+            pokeW(TIMER0, 1000);
 
         endif
 
-        // if ( !pin_Read(IO2) && !screenFliped)
-        if ( pin_Read(IO2) && !screenFliped)
+         if ( !pin_Read(IO2) && !screenFliped)
              screenFliped := 1;
              screenMode++;
              if(screenMode > 2)
@@ -355,121 +315,5 @@ repeat
 
 forever
 
-
-
 endfunc
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
