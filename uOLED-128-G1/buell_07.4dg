@@ -10,12 +10,12 @@
     byte req 0x01, 0x00, 0x42, 0x02, 0xFF, 0x02, 0x43, 0x03, 0xFD
 #END
 
-var combuf[64];
+
 var ETlog[64], AFVlog[64];
 var EngTemp, IntakeTemp, AFV, EngSpeed, GearSelect, BattVolt, Trottle, CheckSum, CalcCS;
 var screenMode, screenFliped, logCount;
-var ETptr, AFVptr, LogParity;
-
+var ETptr, AFVptr, LogParity, offset;
+var combuf[70];
 
 
 
@@ -62,7 +62,7 @@ func DispChart()  // afficher le graphique
 
     // seulement le bas de l'écran
     gfx_Clipping(OFF);
-    gfx_ClipWindow(0, 65, 128, 128);
+    gfx_ClipWindow(0, 65, 127, 127);
     gfx_Clipping(ON);
 
     while (i < 128)
@@ -70,7 +70,7 @@ func DispChart()  // afficher le graphique
         IncPtr();
 
         //efface la ligne courante
-        gfx_Line(i, 128, i, 64, 0x0000);
+        gfx_Line(i, 127, i, 64, 0x0000);
 
         //lecture des 2 buffers
         if (LogParity)
@@ -84,16 +84,19 @@ func DispChart()  // afficher le graphique
         endif
 
         //dessin temperature moteur
-        gfx_Line(i, 128, i, (138 -  ETdot), (0x8200 ));
-        gfx_PutPixel(i, (138 -  ETdot), 0xFC00);
-        gfx_PutPixel(i, (137 -  ETdot), 0xFC00);
+        if(ETdot >0)
+            gfx_Line(i, 128, i, (138 -  ETdot), (0x8200 ));
+            gfx_PutPixel(i, (138 -  ETdot), 0xFC00);
+            gfx_PutPixel(i, (137 -  ETdot), 0xFC00);
+        endif
 
         //dessin AFV
-        gfx_PutPixel(i, (128 -  (AFVdot/3)), 0xFFFF);
-        gfx_PutPixel(i, (129 -  (AFVdot/3)), 0xFFFF);
-        gfx_PutPixel(i, (130 -  (AFVdot/3)), 0x0000);
-        gfx_PutPixel(i, (127 -  (AFVdot/3)), 0x0000);
-
+        if (AFVdot > 0)
+            gfx_PutPixel(i, (128 -  (AFVdot/3)), 0xFFFF);
+            gfx_PutPixel(i, (129 -  (AFVdot/3)), 0xFFFF);
+            gfx_PutPixel(i, (130 -  (AFVdot/3)), 0x0000);
+            gfx_PutPixel(i, (127 -  (AFVdot/3)), 0x0000);
+        endif
         i++;
 
     wend
@@ -165,7 +168,7 @@ func Disp()  // draw different screens
         txt_MoveCursor(2,15);
         print(",");
         txt_MoveCursor(2,11);
-        putnum(0xB30A, (IntakeTemp/10)-40);
+        putnum(0xB30A, ((IntakeTemp/10)-40));
 
         //Engine speed
         txt_FGcolour(0xFC00);
@@ -188,6 +191,14 @@ func Disp()  // draw different screens
         print(",");
         txt_MoveCursor(6,11);
         putnum(0xB30A, (Trottle/10));
+
+        //number revieved
+        txt_FGcolour(0xFC00);
+        txt_MoveCursor(14,0);
+        print("Rx count");
+        txt_FGcolour(0xFFFF);
+        txt_MoveCursor(14, 15);
+        print([UDEC3ZB]offset);
 
         //Check Sum
         txt_FGcolour(0xFC00);
@@ -218,7 +229,7 @@ endfunc
 //--------------- Main -----------------
 
 func main()
-    var chr, x;
+    var chr;
 
     logCount := 0;
     ETptr := 0;
@@ -230,22 +241,24 @@ func main()
     screenMode := 0;
     screenFliped := 0;
 
-    for (x:=0; x<64; x++)
-         ETlog[x] := 0;
-         AFVlog[x] :=0;
+    for (offset:=0; offset<64; offset++)
+         ETlog[offset] := 0;
+         AFVlog[offset] :=0;
     next
-    for (x:=0; x<70; x++)
-         combuf[x] := 0;
+    for (offset:=0; offset<70; offset++)
+         combuf[offset] := 0;
     next
+    gfx_Cls();
+    gfx_Contrast(16);
+    pin_Set(INPUT, IO2);// pin 4 as input
 
 repeat
 
-    gfx_Cls();
-    gfx_Contrast(16);
+
+    //gfx_ScreenMode(LANDSCAPE_R);                 // 7  graphics orientation LANDSCAPE, LANDSCAPE_R, PORTRAIT, PORTRAIT_R
     setbaud(BAUD_9600);                 //  9600 baud comms
-    com_Init(combuf, 128, 0);           // set up a comms circular buffer, use the entire buffer, no sync character
-    pin_Set(INPUT, IO2);                // pin 4 as input
-    pokeW(TIMER0, 2000);                // set delay so we stay in next loop for 1 seconds
+    com_Init(combuf, 140, 0);           // set up a comms circular buffer, use the entire buffer, no sync character
+    pokeW(TIMER0, 1000);                // set delay so we stay in next loop for 1 seconds
 
     repeat
 
@@ -253,7 +266,7 @@ repeat
         screenFliped :=0;
 
             if (com_Count())                            // si quelques chose dans buffer In
-                x := 0;
+                offset := 0;
                 EngSpeed := 0;
                 Trottle := 0;
                 BattVolt := 0;
@@ -266,27 +279,27 @@ repeat
 
                  // vider buffer in
                 while ( (chr:=serin()) >= 0 )
-                    if (x == 11) EngSpeed := EngSpeed + chr;                 // 11
-                    if (x == 12) EngSpeed := EngSpeed + ( chr * 0x100);      // 12
-                    if (x == 25) Trottle := Trottle + chr;                   // 25
-                    if (x == 26) Trottle := Trottle + ( chr * 0x100);        // 26
-                    if (x == 28) BattVolt := BattVolt + chr;                 // 28
-                    if (x == 29) BattVolt := BattVolt + ( chr * 0x100);      // 29
-                    if (x == 30) EngTemp := EngTemp + chr;                   // 30 = offset last byte Engine temp
-                    if (x == 31) EngTemp := EngTemp + ( chr * 0x100);        // 31 = offset first byte Engine temp
-                    if (x == 32) IntakeTemp := IntakeTemp + chr;            // 32
-                    if (x == 33) IntakeTemp := IntakeTemp + ( chr * 0x100); // 33
-                    if (x == 52) AFV := AFV + chr;                          // 52 = AFV
-                    if (x == 53) AFV := AFV + ( chr * 0x100);               // 53 = AFV
-                    if (x == 106) CheckSum := chr;                         // 106 data XOR checksum
-                    if ((x > 0) && (x < 106)) CalcCS ^= chr;       // compute XOR check sum
+                    if (offset == 11) EngSpeed := EngSpeed + chr;                 // 11
+                    if (offset == 12) EngSpeed := EngSpeed + ( chr * 0x100);      // 12
+                    if (offset == 25) Trottle := Trottle + chr;                   // 25
+                    if (offset == 26) Trottle := Trottle + ( chr * 0x100);        // 26
+                    if (offset == 28) BattVolt := BattVolt + chr;                 // 28
+                    if (offset == 29) BattVolt := BattVolt + ( chr * 0x100);      // 29
+                    if (offset == 30) EngTemp := EngTemp + chr;                   // 30 = offset last byte Engine temp
+                    if (offset == 31) EngTemp := EngTemp + ( chr * 0x100);        // 31 = offset first byte Engine temp
+                    if (offset == 32) IntakeTemp := IntakeTemp + chr;            // 32
+                    if (offset == 33) IntakeTemp := IntakeTemp + ( chr * 0x100); // 33
+                    if (offset == 52) AFV := AFV + chr;                          // 52 = AFV
+                    if (offset == 53) AFV := AFV + ( chr * 0x100);               // 53 = AFV
+                    if (offset == 106) CheckSum := chr;                         // 106 data XOR checksum
+                    if ((offset > 0) && (offset < 106)) CalcCS ^= chr;       // compute XOR check sum
 
-                    x++;
+                    offset++;
                 wend
 
                 if (CalcCS == CheckSum)         //si checkSum ok
                     logCount++;
-                    if (logCount > 4)           // Logging tout les n request
+                    if (logCount > 5)           // Logging tout les n request
                         logCount := 0;
                         Log();
                     endif
@@ -295,6 +308,8 @@ repeat
                 Disp();
 
             endif
+
+            com_Init(combuf, 140, 0);
 
             Request();                  // send live data request
 
